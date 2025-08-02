@@ -1,269 +1,130 @@
 # AI塔羅牌占卜系統
 
-一個基於AI的塔羅牌占卜系統，提供多種占卜服務，包括AI塔羅占卜、是否塔羅占卜和每日塔羅運勢。
+一個基於 AI 的線上塔羅牌占卜系統，提供多種占卜服務。
 
-## 🌟 功能特色
+## 功能特色
 
-### 1. AI塔羅占卜
-- **智能解讀**：使用NVIDIA AI模型進行專業的塔羅牌解讀
-- **多種牌陣**：支持1張、3張、5張、7張牌的占卜
-- **分類占卜**：愛情、事業、健康、靈性等不同類型的專門解讀
-- **詳細分析**：提供整體能量分析、每張牌含義、實用建議
+- 🤖 **AI塔羅占卜**: 使用先進的 AI 技術進行塔羅牌解讀
+- ❓ **是否塔羅占卜**: 針對是/否問題的快速占卜
+- 📅 **每日塔羅運勢**: 每日運勢指引
+- 🎨 **美觀界面**: 現代化的響應式設計
+- 📱 **移動端支援**: 完美適配手機和平板
 
-### 2. 是否塔羅占卜
-- **簡單直接**：針對可以用是或否回答的問題
-- **快速解讀**：單張牌快速占卜
-- **明確答案**：提供明確的是/否/可能答案
+## 技術架構
 
-### 3. 每日塔羅運勢
-- **每日指引**：每天一張牌的運勢解讀
-- **生活洞察**：揭示命運軌跡和生活奧秘
-- **實用建議**：提供具體的運勢指引
+- **前端**: HTML5, CSS3, JavaScript, Bootstrap 5
+- **後端**: Node.js, Express.js (本地開發)
+- **部署**: Vercel Serverless Functions
+- **AI**: OpenAI API (NVIDIA Nemotron 模型)
 
-### 4. 美觀界面
-- **響應式設計**：支持各種設備尺寸
-- **現代UI**：使用Bootstrap 5和Font Awesome圖標
-- **流暢動畫**：豐富的CSS動畫效果
-- **神秘風格**：紫色主題的神秘占卜風格
+## 本地開發
 
-## 🚀 技術架構
+### 安裝依賴
 
-### 後端技術
-- **Node.js**：服務器運行環境
-- **Express.js**：Web框架
-- **NVIDIA AI API**：使用Llama 3.3 Nemotron Super模型
-- **CORS**：跨域請求支持
-
-### 前端技術
-- **HTML5**：語義化標記
-- **CSS3**：現代樣式和動畫
-- **JavaScript ES6+**：現代JavaScript功能
-- **Bootstrap 5**：響應式UI框架
-- **Font Awesome**：圖標庫
-
-### AI模型
-- **模型**：nvidia/llama-3.3-nemotron-super-49b-v1.5
-- **溫度**：0.6-0.7（平衡創造性和一致性）
-- **最大令牌**：1024-2048（根據功能調整）
-- **語言**：繁體中文
-
-## 📦 安裝和運行
-
-### 1. 克隆項目
-```bash
-git clone <repository-url>
-cd ai-tarot-system
-```
-
-### 2. 安裝依賴
 ```bash
 npm install
 ```
 
-### 3. 配置環境
-創建 `.env` 文件（可選）：
+### 設置環境變數
+
+創建 `.env` 文件並添加以下配置：
+
 ```env
-PORT=3000
-NVIDIA_API_KEY=your-api-key
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_BASE_URL=https://integrate.api.nvidia.com/v1
 ```
 
-### 4. 啟動服務器
-```bash
-# 開發模式
-npm run dev
+### 啟動開發服務器
 
-# 生產模式
-npm start
-```
-
-### 5. 訪問應用
-打開瀏覽器訪問：`http://localhost:3000`
-
-## 🔧 API端點
-
-### 1. AI塔羅占卜
-```
-POST /api/tarot-reading
-```
-**請求體：**
-```json
-{
-  "question": "我的愛情運勢如何？",
-  "cardCount": 3,
-  "readingType": "love"
-}
-```
-
-### 2. 是否塔羅占卜
-```
-POST /api/yes-no-reading
-```
-**請求體：**
-```json
-{
-  "question": "我應該接受這份工作嗎？"
-}
-```
-
-### 3. 每日塔羅運勢
-```
-GET /api/daily-reading
-```
-
-### 4. 獲取所有塔羅牌
-```
-GET /api/cards
-```
-
-### 5. 隨機抽牌
-```
-POST /api/draw-cards
-```
-**請求體：**
-```json
-{
-  "count": 3
-}
-```
-
-## 🎴 塔羅牌數據
-
-系統包含完整的78張塔羅牌：
-
-### 大阿爾卡納（22張）
-- 愚者、魔術師、女祭司、女皇、皇帝、教皇
-- 戀人、戰車、力量、隱者、命運之輪、正義
-- 倒吊人、死神、節制、惡魔、塔、星星
-- 月亮、太陽、審判、世界
-
-### 小阿爾卡納（56張）
-- **權杖系列**：代表火元素，與行動、創造、熱情相關
-- **聖杯系列**：代表水元素，與情感、愛情、直覺相關
-- **寶劍系列**：代表風元素，與思想、溝通、挑戰相關
-- **錢幣系列**：代表土元素，與物質、財富、穩定相關
-
-## 🤖 AI解讀算法
-
-### 1. 系統提示詞設計
-每個占卜類型都有專門的系統提示詞，確保AI能夠：
-- 理解塔羅牌的基本含義
-- 結合用戶問題進行綜合分析
-- 提供溫暖、支持性的語言
-- 保持神秘而專業的語調
-
-### 2. 解讀流程
-1. **隨機抽牌**：從78張牌中隨機抽取指定數量
-2. **正逆位判斷**：每張牌有50%機率為逆位
-3. **AI分析**：將牌面信息發送給AI進行解讀
-4. **結果展示**：將解讀結果格式化顯示
-
-### 3. 提示詞優化
-- **溫度控制**：0.6-0.7確保創造性和一致性平衡
-- **頻率懲罰**：0.1避免重複內容
-- **存在懲罰**：0.1鼓勵多樣性
-- **最大令牌**：根據功能需求調整
-
-## 🎨 界面設計
-
-### 1. 色彩方案
-- **主色調**：紫色系（#6a4c93, #8e44ad）
-- **強調色**：紅色系（#e74c3c）
-- **背景**：漸變紫色背景
-- **卡片**：半透明白色背景
-
-### 2. 響應式設計
-- **桌面版**：完整功能展示
-- **平板版**：適配中等屏幕
-- **手機版**：單列布局，觸控友好
-
-### 3. 動畫效果
-- **卡片懸停**：縮放和陰影效果
-- **按鈕交互**：上移和陰影變化
-- **載入動畫**：旋轉的載入指示器
-- **滾動動畫**：平滑的頁面滾動
-
-## 🔒 安全考慮
-
-### 1. 輸入驗證
-- 前端表單驗證
-- 後端API參數檢查
-- XSS防護
-
-### 2. 錯誤處理
-- 優雅的錯誤提示
-- 詳細的錯誤日誌
-- 用戶友好的錯誤信息
-
-### 3. API限制
-- 請求頻率限制
-- 輸入長度限制
-- 內容過濾
-
-## 📈 性能優化
-
-### 1. 前端優化
-- 圖片懶加載
-- CSS/JS壓縮
-- 瀏覽器緩存
-
-### 2. 後端優化
-- API響應緩存
-- 數據庫連接池
-- 異步處理
-
-### 3. AI優化
-- 提示詞優化
-- 響應時間控制
-- 錯誤重試機制
-
-## 🚀 部署指南
-
-### 1. 本地開發
 ```bash
 npm run dev
 ```
 
-### 2. 生產部署
+訪問 http://localhost:3000
+
+## Vercel 部署
+
+### 1. 安裝 Vercel CLI
+
 ```bash
-npm start
+npm i -g vercel
 ```
 
-### 3. Docker部署
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-EXPOSE 3000
-CMD ["npm", "start"]
+### 2. 登入 Vercel
+
+```bash
+vercel login
 ```
 
-## 🤝 貢獻指南
+### 3. 部署到 Vercel
 
-1. Fork 項目
-2. 創建功能分支
-3. 提交更改
-4. 推送到分支
-5. 創建 Pull Request
+```bash
+vercel
+```
 
-## 📄 許可證
+### 4. 設置環境變數
+
+在 Vercel 控制台中設置以下環境變數：
+
+- `OPENAI_API_KEY`: 您的 OpenAI API 金鑰
+- `OPENAI_BASE_URL`: OpenAI API 基礎 URL
+
+### 5. 生產環境部署
+
+```bash
+vercel --prod
+```
+
+## API 端點
+
+### AI塔羅占卜
+- **POST** `/api/tarot-reading.js`
+- 參數: `question`, `cardCount`, `readingType`
+
+### 是否塔羅占卜
+- **POST** `/api/yes-no-reading.js`
+- 參數: `question`
+
+### 每日塔羅運勢
+- **GET** `/api/daily-reading.js`
+
+### 獲取所有塔羅牌
+- **GET** `/api/cards.js`
+
+### 隨機抽取塔羅牌
+- **POST** `/api/draw-cards.js`
+- 參數: `count`
+
+## 專案結構
+
+```
+AI-/
+├── api/                    # Vercel Serverless Functions
+│   ├── utils.js           # 共享工具函數
+│   ├── tarot-reading.js   # AI塔羅占卜 API
+│   ├── yes-no-reading.js  # 是否塔羅占卜 API
+│   ├── daily-reading.js   # 每日塔羅運勢 API
+│   ├── cards.js           # 獲取所有塔羅牌 API
+│   └── draw-cards.js      # 隨機抽取塔羅牌 API
+├── public/                 # 靜態文件
+│   ├── index.html         # 主頁面
+│   └── script.js          # 前端 JavaScript
+├── server.js              # 本地開發服務器
+├── package.json           # 專案配置
+├── vercel.json           # Vercel 配置
+└── README.md             # 專案說明
+```
+
+## 環境要求
+
+- Node.js 18+
+- npm 或 yarn
+- Vercel 帳戶 (用於部署)
+
+## 授權
 
 MIT License
 
-## 📞 聯繫方式
+## 支援
 
-如有問題或建議，請通過以下方式聯繫：
-- 郵箱：[your-email@example.com]
-- GitHub：[your-github-profile]
-
-## 🙏 致謝
-
-- NVIDIA 提供的AI API服務
-- Bootstrap 團隊的優秀UI框架
-- Font Awesome 提供的圖標
-- 所有塔羅牌知識的傳承者
-
----
-
-**注意**：此系統僅供娛樂和自我探索使用，不應替代專業的心理諮詢或醫療建議。 
+如有問題，請提交 Issue 或聯繫開發者。 

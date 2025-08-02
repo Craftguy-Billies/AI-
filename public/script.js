@@ -69,7 +69,7 @@ async function handleAiTarotSubmit(event) {
     showLoading();
     
     try {
-        const response = await fetch('/api/tarot-reading', {
+        const response = await fetch('/api/tarot-reading.js', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -110,7 +110,7 @@ async function handleYesNoSubmit(event) {
     showLoading();
     
     try {
-        const response = await fetch('/api/yes-no-reading', {
+        const response = await fetch('/api/yes-no-reading.js', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -140,7 +140,7 @@ async function getDailyReading() {
     showLoading();
     
     try {
-        const response = await fetch('/api/daily-reading');
+        const response = await fetch('/api/daily-reading.js');
         
         if (!response.ok) {
             throw new Error('網絡錯誤');

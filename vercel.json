@@ -1,0 +1,40 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/$1"
+    }
+  ],
+  "functions": {
+    "api/tarot-reading.js": {
+      "maxDuration": 30
+    },
+    "api/yes-no-reading.js": {
+      "maxDuration": 30
+    },
+    "api/daily-reading.js": {
+      "maxDuration": 30
+    },
+    "api/cards.js": {
+      "maxDuration": 10
+    },
+    "api/draw-cards.js": {
+      "maxDuration": 10
+    }
+  }
+} 
