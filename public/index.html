@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI塔羅牌占卜系統</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #6a4c93;
+            --secondary-color: #8e44ad;
+            --accent-color: #e74c3c;
+            --dark-color: #2c3e50;
+            --light-color: #ecf0f1;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Microsoft JhengHei', sans-serif;
+        }
+
+        .navbar {
+            background: rgba(255, 255, 255, 0.1) !important;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .hero-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 3rem;
+            margin: 2rem 0;
+            text-align: center;
+            color: white;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            border: none;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .tarot-card {
+            width: 120px;
+            height: 180px;
+            background: linear-gradient(45deg, #8e44ad, #9b59b6);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            margin: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .tarot-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .tarot-card.reversed {
+            transform: rotate(180deg);
+        }
+
+        .tarot-card.reversed:hover {
+            transform: rotate(180deg) scale(1.05);
+        }
+
+        .btn-mystical {
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            border: none;
+            color: white;
+            border-radius: 25px;
+            padding: 12px 30px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .btn-mystical:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+            color: white;
+        }
+
+        .reading-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .feature-card {
+            text-align: center;
+            padding: 2rem;
+            height: 100%;
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+
+        .nav-tabs .nav-link {
+            border: none;
+            color: var(--dark-color);
+            border-radius: 25px;
+            margin: 0 5px;
+        }
+
+        .nav-tabs .nav-link.active {
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            color: white;
+        }
+
+        .form-control, .form-select {
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            padding: 12px 15px;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(106, 76, 147, 0.25);
+        }
+
+        .reading-result {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-top: 2rem;
+            border-left: 5px solid var(--primary-color);
+        }
+
+        .daily-card {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border-radius: 15px;
+            padding: 2rem;
+            text-align: center;
+            margin: 2rem 0;
+        }
+
+        .footer {
+            background: rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            color: white;
+            text-align: center;
+            padding: 2rem 0;
+            margin-top: 3rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- 導航欄 -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-moon"></i> AI塔羅牌占卜
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#home">首頁</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#services">服務</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#about">關於</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要內容 -->
+    <div class="container">
+        <!-- 英雄區域 -->
+        <section id="home" class="hero-section">
+            <h1 class="display-4 mb-4">
+                <i class="fas fa-star"></i> 免費線上AI塔羅牌占卜
+            </h1>
+            <p class="lead mb-4">2025年最新AI塔羅牌占卜，超準解讀您的愛情、事業、學業運勢</p>
+            <button class="btn btn-mystical btn-lg" onclick="scrollToSection('services')">
+                <i class="fas fa-magic"></i> 開始塔羅占卜
+            </button>
+        </section>
+
+        <!-- 服務區域 -->
+        <section id="services" class="my-5">
+            <h2 class="text-center text-white mb-5">
+                <i class="fas fa-crystal-ball"></i> 塔羅牌占卜服務
+            </h2>
+            
+            <div class="row">
+                <div class="col-md-4 mb-4">
+                    <div class="card feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-brain"></i>
+                        </div>
+                        <h4>AI塔羅占卜</h4>
+                        <p>直覺式塔羅牌占卜，選擇不同風格的塔羅師解讀問題</p>
+                        <button class="btn btn-mystical" onclick="showTab('ai-tarot')">
+                            開始AI塔羅占卜
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="col-md-4 mb-4">
+                    <div class="card feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-question-circle"></i>
+                        </div>
+                        <h4>是否塔羅占卜</h4>
+                        <p>透過簡單的是否問題，獲得線上塔羅牌的智慧指引</p>
+                        <button class="btn btn-mystical" onclick="showTab('yes-no')">
+                            立即進行是非塔羅占卜
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="col-md-4 mb-4">
+                    <div class="card feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-calendar-day"></i>
+                        </div>
+                        <h4>每日塔羅運勢</h4>
+                        <p>探索今日的塔羅指引，揭示您的命運軌跡</p>
+                        <button class="btn btn-mystical" onclick="showTab('daily')">
+                            檢視每日塔羅運勢
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 占卜區域 -->
+        <section class="reading-section">
+            <ul class="nav nav-tabs" id="readingTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="ai-tarot-tab" data-bs-toggle="tab" data-bs-target="#ai-tarot" type="button" role="tab">
+                        <i class="fas fa-brain"></i> AI塔羅占卜
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="yes-no-tab" data-bs-toggle="tab" data-bs-target="#yes-no" type="button" role="tab">
+                        <i class="fas fa-question-circle"></i> 是否塔羅占卜
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="daily-tab" data-bs-toggle="tab" data-bs-target="#daily" type="button" role="tab">
+                        <i class="fas fa-calendar-day"></i> 每日塔羅運勢
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="readingTabContent">
+                <!-- AI塔羅占卜 -->
+                <div class="tab-pane fade show active" id="ai-tarot" role="tabpanel">
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <h4><i class="fas fa-brain"></i> AI塔羅占卜</h4>
+                            <form id="aiTarotForm">
+                                <div class="mb-3">
+                                    <label for="question" class="form-label">您的問題：</label>
+                                    <textarea class="form-control" id="question" rows="3" placeholder="請詳細描述您的問題..." required></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="cardCount" class="form-label">抽牌數量：</label>
+                                    <select class="form-select" id="cardCount">
+                                        <option value="1">1張牌</option>
+                                        <option value="3" selected>3張牌</option>
+                                        <option value="5">5張牌</option>
+                                        <option value="7">7張牌</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="readingType" class="form-label">占卜類型：</label>
+                                    <select class="form-select" id="readingType">
+                                        <option value="general">一般占卜</option>
+                                        <option value="love">愛情占卜</option>
+                                        <option value="career">事業占卜</option>
+                                        <option value="health">健康占卜</option>
+                                        <option value="spiritual">靈性占卜</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-mystical">
+                                    <i class="fas fa-magic"></i> 開始占卜
+                                </button>
+                            </form>
+                        </div>
+                        <div class="col-md-6">
+                            <div id="aiTarotResult"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 是否塔羅占卜 -->
+                <div class="tab-pane fade" id="yes-no" role="tabpanel">
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <h4><i class="fas fa-question-circle"></i> 是否塔羅占卜</h4>
+                            <form id="yesNoForm">
+                                <div class="mb-3">
+                                    <label for="yesNoQuestion" class="form-label">您的問題：</label>
+                                    <textarea class="form-control" id="yesNoQuestion" rows="3" placeholder="請提出一個可以用是或否回答的問題..." required></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-mystical">
+                                    <i class="fas fa-question-circle"></i> 開始占卜
+                                </button>
+                            </form>
+                        </div>
+                        <div class="col-md-6">
+                            <div id="yesNoResult"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 每日塔羅運勢 -->
+                <div class="tab-pane fade" id="daily" role="tabpanel">
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <h4><i class="fas fa-calendar-day"></i> 每日塔羅運勢</h4>
+                            <p>探索今日的塔羅指引，揭示您的命運軌跡。每天一張牌，洞察生活的奧秘。</p>
+                            <button class="btn btn-mystical" onclick="getDailyReading()">
+                                <i class="fas fa-calendar-day"></i> 查看今日運勢
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <div id="dailyResult"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 載入動畫 -->
+        <div id="loading" class="loading">
+            <div class="spinner mb-3"></div>
+            <p>正在進行塔羅牌解讀，請稍候...</p>
+        </div>
+    </div>
+
+    <!-- 頁腳 -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 AI塔羅牌占卜系統. 版權所有.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html> 
