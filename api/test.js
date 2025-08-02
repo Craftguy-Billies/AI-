@@ -1,5 +1,3 @@
-const { getDailyReading } = require('./utils');
-
 module.exports = async (req, res) => {
   // 設置 CORS 標頭
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -18,14 +16,25 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const result = await getDailyReading();
-    res.json(result);
+    // 檢查環境變數
+    const envCheck = {
+      OPENAI_API_KEY: !!process.env.OPENAI_API_KEY,
+      OPENAI_BASE_URL: !!process.env.OPENAI_BASE_URL,
+      NODE_ENV: process.env.NODE_ENV || 'development'
+    };
+
+    res.json({
+      status: 'success',
+      message: 'API 服務正常運行',
+      timestamp: new Date().toISOString(),
+      environment: envCheck,
+      version: '1.0.0'
+    });
   } catch (error) {
-    console.error('每日運勢錯誤:', error);
+    console.error('測試 API 錯誤:', error);
     res.status(500).json({ 
-      error: '服務器錯誤',
-      message: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: '測試 API 錯誤',
+      message: error.message
     });
   }
 }; 

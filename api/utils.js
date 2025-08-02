@@ -6,6 +6,11 @@ const openai = new OpenAI({
   baseURL: process.env.OPENAI_BASE_URL || 'https://integrate.api.nvidia.com/v1',
 });
 
+// 檢查環境變數
+if (!process.env.OPENAI_API_KEY) {
+  console.warn('警告: OPENAI_API_KEY 環境變數未設置，使用默認值');
+}
+
 // 塔羅牌數據
 const tarotCards = [
   { id: 0, name: "愚者", meaning: "新的開始、冒險、純真", reversed: "魯莽、不負責任" },

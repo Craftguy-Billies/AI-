@@ -13,7 +13,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "dest": "/api/$1.js"
     },
     {
       "src": "/(.*)",
@@ -34,6 +34,9 @@
       "maxDuration": 10
     },
     "api/draw-cards.js": {
+      "maxDuration": 10
+    },
+    "api/test.js": {
       "maxDuration": 10
     }
   }
