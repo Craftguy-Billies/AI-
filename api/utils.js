@@ -1,48 +1,5 @@
 const OpenAI = require('openai');
-const crypto = require('crypto');
-
-// ──────────────────────────────────────────────
-//  Logger (structured JSON)
-// ──────────────────────────────────────────────
-const LOG_LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
-const CURRENT_LOG_LEVEL = LOG_LEVELS[process.env.LOG_LEVEL] || LOG_LEVELS.DEBUG;
-
-function formatLog(level, message, meta = {}) {
-  const entry = {
-    timestamp: new Date().toISOString(),
-    level,
-    message,
-    ...meta,
-  };
-  if (LOG_LEVELS[level] >= CURRENT_LOG_LEVEL) {
-    if (level === 'ERROR') {
-      console.error(JSON.stringify(entry));
-    } else if (level === 'WARN') {
-      console.warn(JSON.stringify(entry));
-    } else {
-      console.log(JSON.stringify(entry));
-    }
-  }
-}
-
-const log = {
-  debug: (msg, meta) => formatLog('DEBUG', msg, meta),
-  info: (msg, meta) => formatLog('INFO', msg, meta),
-  warn: (msg, meta) => formatLog('WARN', msg, meta),
-  error: (msg, meta) => formatLog('ERROR', msg, meta),
-};
-
-// ──────────────────────────────────────────────
-//  Helpers
-// ──────────────────────────────────────────────
-function generateRequestId() {
-  return crypto.randomUUID().slice(0, 8);
-}
-
-function safeString(val, maxLen = 200) {
-  if (typeof val !== 'string') return String(val || '');
-  return val.length > maxLen ? val.slice(0, maxLen) + '…' : val;
-}
+const { log, generateRequestId, safeString } = require('./logger');
 
 // ──────────────────────────────────────────────
 //  OpenAI setup (lazy init to avoid crash when missing key)
@@ -193,7 +150,7 @@ function drawCards(count, reqId = 'anon') {
 
   const shuffled = fisherYatesShuffle(allCards);
   const drawn = shuffled.slice(0, count).map(card => {
-    const isReversed = Math.random() > 0.5;
+    const isReversed = Math.random() >= 0.5;
     return { ...card, isReversed };
   });
 
@@ -212,6 +169,7 @@ function drawCards(count, reqId = 'anon') {
 async function callAI(messages, opts = {}, reqId = 'anon') {
   const start = Date.now();
   const model = opts.model || 'nvidia/llama-3.3-nemotron-super-49b-v1.5';
+  const timeoutMs = opts.timeout || 60000;
 
   const client = getOpenAI();
   if (!client) {
@@ -225,6 +183,7 @@ async function callAI(messages, opts = {}, reqId = 'anon') {
     messages: messages.map(m => ({ role: m.role, contentLen: m.content.length })),
     temperature: opts.temperature,
     max_tokens: opts.max_tokens,
+    timeout: timeoutMs,
   });
 
   try {
@@ -236,6 +195,7 @@ async function callAI(messages, opts = {}, reqId = 'anon') {
       max_tokens: opts.max_tokens ?? 1024,
       frequency_penalty: opts.frequency_penalty ?? 0,
       presence_penalty: opts.presence_penalty ?? 0,
+      timeout: timeoutMs,
     });
 
     const elapsed = Date.now() - start;
@@ -269,10 +229,18 @@ async function callAI(messages, opts = {}, reqId = 'anon') {
 }
 
 // AI塔羅解讀
+const MAX_QUESTION_LENGTH = 2000;
+
 async function getTarotReading(cards, question, readingType = 'general', reqId = 'anon') {
   if (!cards || cards.length === 0) {
     log.warn('getTarotReading: no cards provided', { reqId, questionLen: question?.length });
     return '抱歉，無法在沒有塔羅牌的情況下進行解讀。請重新嘗試。';
+  }
+
+  // Truncate excessively long questions
+  if (question && question.length > MAX_QUESTION_LENGTH) {
+    log.warn('getTarotReading: question truncated', { reqId, originalLen: question.length });
+    question = question.slice(0, MAX_QUESTION_LENGTH) + '…';
   }
 
   const cardDescriptions = cards.map(card =>
@@ -427,4 +395,5 @@ module.exports = {
   log,
   generateRequestId,
   safeString,
+  MAX_QUESTION_LENGTH,
 }; 

@@ -1,4 +1,4 @@
-const { log, generateRequestId } = require('./utils');
+const { log, generateRequestId } = require('./logger');
 
 module.exports = async (req, res) => {
   // 設置 CORS 標頭
