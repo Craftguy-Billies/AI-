@@ -1,15 +1,73 @@
 const OpenAI = require('openai');
+const crypto = require('crypto');
 
-// OpenAI配置
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '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',
-  baseURL: process.env.OPENAI_BASE_URL || 'https://integrate.api.nvidia.com/v1',
-});
+// ──────────────────────────────────────────────
+//  Logger (structured JSON)
+// ──────────────────────────────────────────────
+const LOG_LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
+const CURRENT_LOG_LEVEL = LOG_LEVELS[process.env.LOG_LEVEL] || LOG_LEVELS.DEBUG;
 
-// 檢查環境變數
-if (!process.env.OPENAI_API_KEY) {
-  console.warn('警告: OPENAI_API_KEY 環境變數未設置，使用默認值');
+function formatLog(level, message, meta = {}) {
+  const entry = {
+    timestamp: new Date().toISOString(),
+    level,
+    message,
+    ...meta,
+  };
+  if (LOG_LEVELS[level] >= CURRENT_LOG_LEVEL) {
+    if (level === 'ERROR') {
+      console.error(JSON.stringify(entry));
+    } else if (level === 'WARN') {
+      console.warn(JSON.stringify(entry));
+    } else {
+      console.log(JSON.stringify(entry));
+    }
+  }
 }
+
+const log = {
+  debug: (msg, meta) => formatLog('DEBUG', msg, meta),
+  info: (msg, meta) => formatLog('INFO', msg, meta),
+  warn: (msg, meta) => formatLog('WARN', msg, meta),
+  error: (msg, meta) => formatLog('ERROR', msg, meta),
+};
+
+// ──────────────────────────────────────────────
+//  Helpers
+// ──────────────────────────────────────────────
+function generateRequestId() {
+  return crypto.randomUUID().slice(0, 8);
+}
+
+function safeString(val, maxLen = 200) {
+  if (typeof val !== 'string') return String(val || '');
+  return val.length > maxLen ? val.slice(0, maxLen) + '…' : val;
+}
+
+// ──────────────────────────────────────────────
+//  OpenAI setup (lazy init to avoid crash when missing key)
+// ──────────────────────────────────────────────
+let _openai = null;
+
+function getOpenAI() {
+  if (_openai) return _openai;
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    log.warn('OPENAI_API_KEY not set — AI features will return fallback messages', {
+      env_keys: Object.keys(process.env).filter(k => /^OPENAI/i.test(k)),
+    });
+    return null;
+  }
+  _openai = new OpenAI({
+    apiKey,
+    baseURL: process.env.OPENAI_BASE_URL || 'https://integrate.api.nvidia.com/v1',
+  });
+  log.info('OpenAI client initialized', { baseURL: _openai.baseURL });
+  return _openai;
+}
+
+// Backward-compat export (may be null if API key is missing)
+const openai = getOpenAI();
 
 // 塔羅牌數據
 const tarotCards = [
@@ -105,19 +163,119 @@ const minorArcana = [
 ];
 
 const allCards = [...tarotCards, ...minorArcana];
+const MAX_CARDS = allCards.length; // 78
 
-// 隨機抽取塔羅牌
-function drawCards(count) {
-  const shuffled = [...allCards].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count).map(card => ({
-    ...card,
-    isReversed: Math.random() > 0.5
-  }));
+// Fisher-Yates shuffle for unbiased randomness
+function fisherYatesShuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// 隨機抽取塔羅牌 with validation & logging
+function drawCards(count, reqId = 'anon') {
+  // Validate count
+  if (count === null || count === undefined || typeof count !== 'number' || isNaN(count)) {
+    log.warn('drawCards: invalid count type', { reqId, count, type: typeof count });
+    count = 1;
+  }
+  if (count < 1) {
+    log.warn('drawCards: count < 1, clamping to 1', { reqId, count });
+    count = 1;
+  }
+  if (count > MAX_CARDS) {
+    log.warn('drawCards: count exceeds deck size, clamping', { reqId, count, max: MAX_CARDS });
+    count = MAX_CARDS;
+  }
+
+  const shuffled = fisherYatesShuffle(allCards);
+  const drawn = shuffled.slice(0, count).map(card => {
+    const isReversed = Math.random() > 0.5;
+    return { ...card, isReversed };
+  });
+
+  log.info('drawCards: cards drawn', {
+    reqId,
+    count: drawn.length,
+    cardNames: drawn.map(c => `${c.name}${c.isReversed ? '(逆)' : ''}`).join(', '),
+  });
+
+  return drawn;
+}
+
+// ──────────────────────────────────────────────
+//  AI call wrapper with logging & fallback
+// ──────────────────────────────────────────────
+async function callAI(messages, opts = {}, reqId = 'anon') {
+  const start = Date.now();
+  const model = opts.model || 'nvidia/llama-3.3-nemotron-super-49b-v1.5';
+
+  const client = getOpenAI();
+  if (!client) {
+    log.warn('callAI: no OpenAI client (API key missing)', { reqId, model });
+    throw new Error('AI service unavailable: OPENAI_API_KEY not configured');
+  }
+
+  log.info('AI call starting', {
+    reqId,
+    model,
+    messages: messages.map(m => ({ role: m.role, contentLen: m.content.length })),
+    temperature: opts.temperature,
+    max_tokens: opts.max_tokens,
+  });
+
+  try {
+    const completion = await client.chat.completions.create({
+      model,
+      messages,
+      temperature: opts.temperature ?? 0.7,
+      top_p: opts.top_p ?? 0.9,
+      max_tokens: opts.max_tokens ?? 1024,
+      frequency_penalty: opts.frequency_penalty ?? 0,
+      presence_penalty: opts.presence_penalty ?? 0,
+    });
+
+    const elapsed = Date.now() - start;
+    const content = completion.choices?.[0]?.message?.content || '';
+
+    log.info('AI call succeeded', {
+      reqId,
+      elapsed,
+      responseLen: content.length,
+      finishReason: completion.choices?.[0]?.finish_reason,
+      model: completion.model,
+      usage: completion.usage,
+    });
+
+    return content;
+  } catch (error) {
+    const elapsed = Date.now() - start;
+    log.error('AI call failed', {
+      reqId,
+      elapsed,
+      errorName: error.name,
+      errorMessage: error.message,
+      errorStatus: error.status,
+      errorCode: error.code,
+      errorType: error.type,
+      stack: error.stack?.split('\n').slice(0, 4).join(' | '),
+    });
+
+    throw error;
+  }
 }
 
 // AI塔羅解讀
-async function getTarotReading(cards, question, readingType = 'general') {
-  const cardDescriptions = cards.map(card => 
+async function getTarotReading(cards, question, readingType = 'general', reqId = 'anon') {
+  if (!cards || cards.length === 0) {
+    log.warn('getTarotReading: no cards provided', { reqId, questionLen: question?.length });
+    return '抱歉，無法在沒有塔羅牌的情況下進行解讀。請重新嘗試。';
+  }
+
+  const cardDescriptions = cards.map(card =>
     `${card.name}${card.isReversed ? ' (逆位)' : ''}: ${card.isReversed ? card.reversed : card.meaning}`
   ).join('\n');
 
@@ -144,31 +302,37 @@ ${cardDescriptions}
 - 實用的建議和指引
 - 未來發展的提示`;
 
-  try {
-    const completion = await openai.chat.completions.create({
-      model: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: `請為我解讀這些塔羅牌：${cardDescriptions}\n\n我的問題是：${question}` }
-      ],
-      temperature: 0.7,
-      top_p: 0.9,
-      max_tokens: 2048,
-      frequency_penalty: 0.1,
-      presence_penalty: 0.1,
-    });
+  log.info('getTarotReading: sending to AI', {
+    reqId,
+    cardCount: cards.length,
+    readingType,
+    questionLen: question?.length,
+  });
 
-    return completion.choices[0].message.content;
+  try {
+    return await callAI(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `請為我解讀這些塔羅牌：${cardDescriptions}\n\n我的問題是：${question}` },
+      ],
+      { temperature: 0.7, top_p: 0.9, max_tokens: 2048, frequency_penalty: 0.1, presence_penalty: 0.1 },
+      reqId,
+    );
   } catch (error) {
-    console.error('AI API錯誤:', error);
+    log.error('getTarotReading: AI failed, returning fallback', { reqId, error: error.message });
     return '抱歉，解讀服務暫時無法使用，請稍後再試。';
   }
 }
 
 // 是否塔羅占卜
-async function getYesNoReading(question) {
-  const card = drawCards(1)[0];
-  
+async function getYesNoReading(question, reqId = 'anon') {
+  const card = drawCards(1, reqId)[0];
+
+  if (!card) {
+    log.error('getYesNoReading: failed to draw a card', { reqId });
+    return { card: null, reading: '抱歉，抽牌失敗，請稍後再試。' };
+  }
+
   const systemPrompt = `你是一位專業的塔羅牌占卜師，專門進行是否問題的占卜。請根據抽到的塔羅牌為用戶提供明確的是否答案和詳細解釋。
 
 解讀要求：
@@ -188,35 +352,34 @@ async function getYesNoReading(question) {
 - 詳細的解釋
 - 相關建議`;
 
-  try {
-    const completion = await openai.chat.completions.create({
-      model: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: `我的問題是：${question}\n\n抽到的牌是：${card.name}${card.isReversed ? ' (逆位)' : ''}` }
-      ],
-      temperature: 0.6,
-      top_p: 0.9,
-      max_tokens: 1024,
-    });
+  log.info('getYesNoReading: sending to AI', { reqId, card: card.name, isReversed: card.isReversed, questionLen: question?.length });
 
-    return {
-      card: card,
-      reading: completion.choices[0].message.content
-    };
+  try {
+    const content = await callAI(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `我的問題是：${question}\n\n抽到的牌是：${card.name}${card.isReversed ? ' (逆位)' : ''}` }
+      ],
+      { temperature: 0.6, top_p: 0.9, max_tokens: 1024 },
+      reqId,
+    );
+
+    return { card, reading: content };
   } catch (error) {
-    console.error('AI API錯誤:', error);
-    return {
-      card: card,
-      reading: '抱歉，解讀服務暫時無法使用，請稍後再試。'
-    };
+    log.error('getYesNoReading: AI failed, returning fallback', { reqId, error: error.message });
+    return { card, reading: '抱歉，解讀服務暫時無法使用，請稍後再試。' };
   }
 }
 
 // 每日塔羅運勢
-async function getDailyReading() {
-  const card = drawCards(1)[0];
-  
+async function getDailyReading(reqId = 'anon') {
+  const card = drawCards(1, reqId)[0];
+
+  if (!card) {
+    log.error('getDailyReading: failed to draw a card', { reqId });
+    return { card: null, reading: '抱歉，抽牌失敗，請稍後再試。' };
+  }
+
   const systemPrompt = `你是一位專業的塔羅牌占卜師，專門提供每日塔羅運勢解讀。請根據抽到的塔羅牌為用戶提供今日運勢指引。
 
 解讀要求：
@@ -234,28 +397,22 @@ async function getDailyReading() {
 - 具體指引
 - 幸運提示`;
 
-  try {
-    const completion = await openai.chat.completions.create({
-      model: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: `請為我解讀今日的塔羅運勢，抽到的牌是：${card.name}${card.isReversed ? ' (逆位)' : ''}` }
-      ],
-      temperature: 0.7,
-      top_p: 0.9,
-      max_tokens: 1024,
-    });
+  log.info('getDailyReading: sending to AI', { reqId, card: card.name, isReversed: card.isReversed });
 
-    return {
-      card: card,
-      reading: completion.choices[0].message.content
-    };
+  try {
+    const content = await callAI(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `請為我解讀今日的塔羅運勢，抽到的牌是：${card.name}${card.isReversed ? ' (逆位)' : ''}` }
+      ],
+      { temperature: 0.7, top_p: 0.9, max_tokens: 1024 },
+      reqId,
+    );
+
+    return { card, reading: content };
   } catch (error) {
-    console.error('AI API錯誤:', error);
-    return {
-      card: card,
-      reading: '抱歉，運勢解讀服務暫時無法使用，請稍後再試。'
-    };
+    log.error('getDailyReading: AI failed, returning fallback', { reqId, error: error.message });
+    return { card, reading: '抱歉，運勢解讀服務暫時無法使用，請稍後再試。' };
   }
 }
 
@@ -265,5 +422,9 @@ module.exports = {
   drawCards,
   getTarotReading,
   getYesNoReading,
-  getDailyReading
+  getDailyReading,
+  callAI,
+  log,
+  generateRequestId,
+  safeString,
 }; 

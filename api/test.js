@@ -1,5 +1,11 @@
+const { log, generateRequestId } = require('./utils');
+
 module.exports = async (req, res) => {
   // 設置 CORS 標頭
+  const rid = generateRequestId();
+
+  log.info('test: health check started', { rid });
+
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -23,16 +29,19 @@ module.exports = async (req, res) => {
       NODE_ENV: process.env.NODE_ENV || 'development'
     };
 
+    log.info('test: health check result', { rid, envCheck });
+
     res.json({
       status: 'success',
       message: 'API 服務正常運行',
       timestamp: new Date().toISOString(),
       environment: envCheck,
-      version: '1.0.0'
+      version: '1.0.0',
+      requestId: rid
     });
   } catch (error) {
-    console.error('測試 API 錯誤:', error);
-    res.status(500).json({ 
+    log.error('test: unhandled error', { rid, error: error.message });
+    res.status(500).json({
       error: '測試 API 錯誤',
       message: error.message
     });

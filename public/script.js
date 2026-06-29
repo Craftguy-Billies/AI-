@@ -1,162 +1,213 @@
+// ──────────────────────────────────────────────
+//  Frontend Logger
+// ──────────────────────────────────────────────
+const frontendLog = {
+    debug: (msg, meta) => console.debug('[FE-DEBUG] ' + msg, meta || ''),
+    info: (msg, meta) => console.info('[FE-INFO] ' + msg, meta || ''),
+    warn: (msg, meta) => console.warn('[FE-WARN] ' + msg, meta || ''),
+    error: (msg, meta) => console.error('[FE-ERROR] ' + msg, meta || ''),
+};
+
 // 全局變量
 let currentCards = [];
 
 // 頁面載入完成後初始化
 document.addEventListener('DOMContentLoaded', function() {
+    frontendLog.info('DOM loaded, initializing event listeners');
     initializeEventListeners();
 });
 
 // 初始化事件監聽器
 function initializeEventListeners() {
-    // AI塔羅占卜表單
     const aiTarotForm = document.getElementById('aiTarotForm');
     if (aiTarotForm) {
         aiTarotForm.addEventListener('submit', handleAiTarotSubmit);
+        frontendLog.debug('aiTarotForm listener attached');
+    } else {
+        frontendLog.warn('aiTarotForm element not found');
     }
 
-    // 是否塔羅占卜表單
     const yesNoForm = document.getElementById('yesNoForm');
     if (yesNoForm) {
         yesNoForm.addEventListener('submit', handleYesNoSubmit);
+        frontendLog.debug('yesNoForm listener attached');
+    } else {
+        frontendLog.warn('yesNoForm element not found');
+    }
+
+    const dailyBtn = document.querySelector('[onclick="getDailyReading()"]');
+    if (!dailyBtn) {
+        frontendLog.warn('daily reading button (onclick) not found');
     }
 }
 
-// 滾動到指定區域
 function scrollToSection(sectionId) {
     const element = document.getElementById(sectionId);
     if (element) {
         element.scrollIntoView({ behavior: 'smooth' });
+        frontendLog.debug('scrolled to section', { sectionId });
+    } else {
+        frontendLog.warn('scroll target not found', { sectionId });
     }
 }
 
-// 顯示指定標籤頁
 function showTab(tabId) {
-    const tab = new bootstrap.Tab(document.querySelector(`#${tabId}-tab`));
+    const tabEl = document.querySelector('#' + tabId + '-tab');
+    if (!tabEl) {
+        frontendLog.warn('showTab: tab element not found', { tabId });
+        return;
+    }
+    const tab = new bootstrap.Tab(tabEl);
     tab.show();
+    frontendLog.debug('tab shown', { tabId });
     scrollToSection('services');
 }
 
-// 顯示載入動畫
 function showLoading() {
     const loading = document.getElementById('loading');
     if (loading) {
         loading.style.display = 'block';
         loading.scrollIntoView({ behavior: 'smooth' });
+        frontendLog.debug('loading shown');
+    } else {
+        frontendLog.warn('loading element not found');
     }
 }
 
-// 隱藏載入動畫
 function hideLoading() {
     const loading = document.getElementById('loading');
     if (loading) {
         loading.style.display = 'none';
+        frontendLog.debug('loading hidden');
     }
 }
 
-// 處理AI塔羅占卜提交
+// ──────────────────────────────────────────────
+//  Unified fetch wrapper with timeout & logging
+// ──────────────────────────────────────────────
+async function apiFetch(url, options, timeoutMs) {
+    if (options === undefined) options = {};
+    if (timeoutMs === undefined) timeoutMs = 30000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(function () { controller.abort(); }, timeoutMs);
+
+    frontendLog.debug('apiFetch: starting', { url: url, method: options.method || 'GET' });
+
+    try {
+        const response = await fetch(url, Object.assign({}, options, { signal: controller.signal }));
+        clearTimeout(timeoutId);
+
+        frontendLog.debug('apiFetch: response received', { url: url, status: response.status, ok: response.ok });
+
+        if (!response.ok) {
+            var errBody = '';
+            try { errBody = await response.text(); } catch (e) { /* ignore */ }
+            throw new Error('HTTP ' + response.status + ': ' + (errBody || response.statusText));
+        }
+
+        return await response.json();
+    } catch (error) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+            throw new Error('請求超時，請檢查網絡連接後重試');
+        }
+        throw error;
+    }
+}
+
+// ──────────────────────────────────────────────
+//  Handler: AI塔羅占卜
+// ──────────────────────────────────────────────
 async function handleAiTarotSubmit(event) {
     event.preventDefault();
-    
-    const question = document.getElementById('question').value.trim();
-    const cardCount = parseInt(document.getElementById('cardCount').value);
-    const readingType = document.getElementById('readingType').value;
-    
-    if (!question) {
-        alert('請輸入您的問題');
+
+    var question = document.getElementById('question').value.trim();
+    var cardCount = parseInt(document.getElementById('cardCount').value);
+    var readingType = document.getElementById('readingType').value;
+
+    var formErrors = validateForm({ question: question, cardCount: cardCount });
+    if (formErrors.length > 0) {
+        showValidationErrors(formErrors);
+        frontendLog.warn('aiTarot form validation failed', { errors: formErrors });
         return;
     }
-    
+
+    frontendLog.info('aiTarot: submitting', { cardCount: cardCount, readingType: readingType, questionLen: question.length });
     showLoading();
-    
+
     try {
-        const response = await fetch('/api/tarot-reading', {
+        var data = await apiFetch('/api/tarot-reading', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                question: question,
-                cardCount: cardCount,
-                readingType: readingType
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question: question, cardCount: cardCount, readingType: readingType })
         });
-        
-        if (!response.ok) {
-            throw new Error('網絡錯誤');
-        }
-        
-        const data = await response.json();
+
+        frontendLog.info('aiTarot: success', { cardCount: data.cards ? data.cards.length : 0, readingLen: data.reading ? data.reading.length : 0 });
         displayAiTarotResult(data);
-        
+        saveReadingHistory({ type: 'ai-tarot', question: question, cardCount: cardCount, readingType: readingType });
     } catch (error) {
-        console.error('AI塔羅占卜錯誤:', error);
-        alert('占卜過程中發生錯誤，請稍後再試');
+        frontendLog.error('aiTarot: fetch failed', { error: error.message });
+        handleError(error, 'AI塔羅占卜');
     } finally {
         hideLoading();
     }
 }
 
-// 處理是否塔羅占卜提交
+// ──────────────────────────────────────────────
+//  Handler: 是否塔羅占卜
+// ──────────────────────────────────────────────
 async function handleYesNoSubmit(event) {
     event.preventDefault();
-    
-    const question = document.getElementById('yesNoQuestion').value.trim();
-    
+
+    var question = document.getElementById('yesNoQuestion').value.trim();
+
     if (!question) {
         alert('請輸入您的問題');
+        frontendLog.warn('yesNo: empty question');
         return;
     }
-    
+
+    frontendLog.info('yesNo: submitting', { questionLen: question.length });
     showLoading();
-    
+
     try {
-        const response = await fetch('/api/yes-no-reading', {
+        var data = await apiFetch('/api/yes-no-reading', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                question: question
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question: question })
         });
-        
-        if (!response.ok) {
-            throw new Error('網絡錯誤');
-        }
-        
-        const data = await response.json();
+
+        frontendLog.info('yesNo: success', { card: data.card ? data.card.name : 'N/A', readingLen: data.reading ? data.reading.length : 0 });
         displayYesNoResult(data);
-        
+        saveReadingHistory({ type: 'yes-no', question: question });
     } catch (error) {
-        console.error('是否塔羅占卜錯誤:', error);
-        alert('占卜過程中發生錯誤，請稍後再試');
+        frontendLog.error('yesNo: fetch failed', { error: error.message });
+        handleError(error, '是否塔羅占卜');
     } finally {
         hideLoading();
     }
 }
 
-// 獲取每日塔羅運勢
+// ──────────────────────────────────────────────
+//  Handler: 每日塔羅運勢
+// ──────────────────────────────────────────────
 async function getDailyReading() {
+    frontendLog.info('dailyReading: fetching');
     showLoading();
-    
+
     try {
-        const response = await fetch('/api/daily-reading');
-        
-        if (!response.ok) {
-            throw new Error('網絡錯誤');
-        }
-        
-        const data = await response.json();
+        var data = await apiFetch('/api/daily-reading');
+
+        frontendLog.info('dailyReading: success', { card: data.card ? data.card.name : 'N/A', readingLen: data.reading ? data.reading.length : 0 });
         displayDailyResult(data);
-        
+        saveReadingHistory({ type: 'daily' });
     } catch (error) {
-        console.error('每日運勢錯誤:', error);
-        alert('獲取每日運勢時發生錯誤，請稍後再試');
+        frontendLog.error('dailyReading: fetch failed', { error: error.message });
+        handleError(error, '獲取每日運勢');
     } finally {
         hideLoading();
     }
 }
-
 // 顯示AI塔羅占卜結果
 function displayAiTarotResult(data) {
     const resultDiv = document.getElementById('aiTarotResult');
