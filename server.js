@@ -30,11 +30,15 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '10kb' }));
 app.use(express.static('public'));
 
-// Malformed JSON body handler
+// Malformed JSON / body too large handler
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     log.warn('malformed JSON body', { rid: req.rid, error: err.message });
     return res.status(400).json({ error: '請求格式無效，請檢查JSON格式' });
+  }
+  if (err.type === 'entity.too.large') {
+    log.warn('request body too large', { rid: req.rid, limit: '10kb' });
+    return res.status(413).json({ error: '請求內容過大，最大限制為 10KB' });
   }
   next(err);
 });
@@ -50,14 +54,16 @@ app.use((req, res, next) => {
   const originalJson = res.json.bind(res);
   res.json = function (body) {
     const elapsed = Date.now() - start;
-    log.info('request completed', {
-      rid,
-      method: req.method,
-      url: req.originalUrl,
-      status: res.statusCode,
-      elapsed,
-      bodySize: JSON.stringify(body).length,
-    });
+    try {
+      log.info('request completed', {
+        rid,
+        method: req.method,
+        url: req.originalUrl,
+        status: res.statusCode,
+        elapsed,
+        bodySize: JSON.stringify(body).length,
+      });
+    } catch (_) { /* logging must never crash the response */ }
     return originalJson(body);
   };
   log.info('request started', { rid, method: req.method, url: req.originalUrl, ip: req.ip });
@@ -87,7 +93,8 @@ app.get('/', (req, res) => {
 app.post('/api/tarot-reading', async (req, res) => {
   const rid = req.rid || generateRequestId();
   try {
-    const { question, cardCount = 3, readingType = 'general' } = req.body;
+    const body = req.body || {};
+    const { question, cardCount = 3, readingType = 'general' } = body;
 
     if (!question || typeof question !== 'string' || !question.trim()) {
       log.warn('tarot-reading: missing question', { rid });
@@ -123,7 +130,8 @@ app.post('/api/tarot-reading', async (req, res) => {
 app.post('/api/yes-no-reading', async (req, res) => {
   const rid = req.rid || generateRequestId();
   try {
-    const { question } = req.body;
+    const body = req.body || {};
+    const { question } = body;
 
     if (!question || typeof question !== 'string' || !question.trim()) {
       log.warn('yes-no-reading: missing question', { rid });
@@ -177,10 +185,11 @@ app.get('/api/cards', (req, res) => {
 app.post('/api/draw-cards', (req, res) => {
   const rid = req.rid || generateRequestId();
   try {
-    let { count = 1 } = req.body;
+    const body = req.body || {};
+    let { count = 1 } = body;
     count = parseInt(count, 10);
     if (isNaN(count) || count < 1) {
-      log.warn('draw-cards: invalid count, defaulting to 1', { rid, originalCount: req.body.count });
+      log.warn('draw-cards: invalid count, defaulting to 1', { rid, originalCount: body.count });
       count = 1;
     }
 

@@ -150,7 +150,7 @@ function drawCards(count, reqId = 'anon') {
 
   const shuffled = fisherYatesShuffle(allCards);
   const drawn = shuffled.slice(0, count).map(card => {
-    const isReversed = Math.random() > 0.5;
+    const isReversed = Math.random() >= 0.5;
     return { ...card, isReversed };
   });
 
