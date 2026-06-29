@@ -2,30 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
-const crypto = require('crypto');
-
-// ──────────────────────────────────────────────
-//  Logger
-// ──────────────────────────────────────────────
-const LOG_LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
-const CURRENT_LOG_LEVEL = LOG_LEVELS[process.env.LOG_LEVEL] || LOG_LEVELS.DEBUG;
-
-function formatLog(level, message, meta = {}) {
-  const entry = { timestamp: new Date().toISOString(), level, message, ...meta };
-  if (LOG_LEVELS[level] >= CURRENT_LOG_LEVEL) {
-    if (level === 'ERROR') console.error(JSON.stringify(entry));
-    else if (level === 'WARN') console.warn(JSON.stringify(entry));
-    else console.log(JSON.stringify(entry));
-  }
-}
-const log = {
-  debug: (m, meta) => formatLog('DEBUG', m, meta),
-  info: (m, meta) => formatLog('INFO', m, meta),
-  warn: (m, meta) => formatLog('WARN', m, meta),
-  error: (m, meta) => formatLog('ERROR', m, meta),
-};
-
-function reqId() { return crypto.randomUUID().slice(0, 8); }
+const { log, generateRequestId } = require('./api/logger');
 
 // ──────────────────────────────────────────────
 //  App setup
@@ -41,7 +18,7 @@ app.use(express.static('public'));
 //  Request logging middleware (all routes)
 // ──────────────────────────────────────────────
 app.use((req, res, next) => {
-  const rid = reqId();
+  const rid = generateRequestId();
   req.rid = rid;
   const start = Date.now();
   const originalJson = res.json.bind(res);
@@ -82,7 +59,7 @@ app.get('/', (req, res) => {
 
 // AI塔羅占卜
 app.post('/api/tarot-reading', async (req, res) => {
-  const rid = req.rid || reqId();
+  const rid = req.rid || generateRequestId();
   try {
     const { question, cardCount = 3, readingType = 'general' } = req.body;
 
@@ -118,7 +95,7 @@ app.post('/api/tarot-reading', async (req, res) => {
 
 // 是否塔羅占卜
 app.post('/api/yes-no-reading', async (req, res) => {
-  const rid = req.rid || reqId();
+  const rid = req.rid || generateRequestId();
   try {
     const { question } = req.body;
 
@@ -145,7 +122,7 @@ app.post('/api/yes-no-reading', async (req, res) => {
 
 // 每日塔羅運勢
 app.get('/api/daily-reading', async (req, res) => {
-  const rid = req.rid || reqId();
+  const rid = req.rid || generateRequestId();
   try {
     log.info('daily-reading: processing', { rid });
 
@@ -165,14 +142,14 @@ app.get('/api/daily-reading', async (req, res) => {
 
 // 獲取所有塔羅牌
 app.get('/api/cards', (req, res) => {
-  const rid = req.rid || reqId();
+  const rid = req.rid || generateRequestId();
   log.info('cards: returning all cards', { rid, count: allCards.length });
   res.json(allCards);
 });
 
 // 隨機抽取指定數量的牌
 app.post('/api/draw-cards', (req, res) => {
-  const rid = req.rid || reqId();
+  const rid = req.rid || generateRequestId();
   try {
     let { count = 1 } = req.body;
     count = parseInt(count, 10);
@@ -187,6 +164,29 @@ app.post('/api/draw-cards', (req, res) => {
     log.error('draw-cards: unhandled error', { rid, error: error.message });
     res.status(500).json({ error: '服務器錯誤' });
   }
+});
+
+// Health check / test endpoint
+app.get('/api/test', (req, res) => {
+  const rid = req.rid || generateRequestId();
+  log.info('test: health check', { rid });
+  res.json({
+    status: 'success',
+    message: 'API 服務正常運行',
+    timestamp: new Date().toISOString(),
+    environment: {
+      OPENAI_API_KEY: !!process.env.OPENAI_API_KEY,
+      OPENAI_BASE_URL: !!process.env.OPENAI_BASE_URL,
+      NODE_ENV: process.env.NODE_ENV || 'development',
+    },
+    version: '1.0.0',
+    requestId: rid,
+  });
+});
+
+// Favicon (silent 204 to avoid 404 noise)
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end();
 });
 
 // 404 handler
