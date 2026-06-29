@@ -5,6 +5,22 @@ const path = require('path');
 const { log, generateRequestId } = require('./api/logger');
 
 // ──────────────────────────────────────────────
+//  Active request tracking for graceful shutdown
+// ──────────────────────────────────────────────
+let activeRequests = 0;
+let shuttingDown = false;
+
+function trackRequest(req, res, next) {
+  if (shuttingDown) {
+    log.warn('request rejected during shutdown', { url: req.originalUrl });
+    return res.status(503).json({ error: '伺服器正在關閉中，請稍後再試' });
+  }
+  activeRequests++;
+  res.on('finish', () => { activeRequests--; });
+  next();
+}
+
+// ──────────────────────────────────────────────
 //  App setup
 // ──────────────────────────────────────────────
 const app = express();
@@ -14,9 +30,19 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '10kb' }));
 app.use(express.static('public'));
 
+// Malformed JSON body handler
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    log.warn('malformed JSON body', { rid: req.rid, error: err.message });
+    return res.status(400).json({ error: '請求格式無效，請檢查JSON格式' });
+  }
+  next(err);
+});
+
 // ──────────────────────────────────────────────
 //  Request logging middleware (all routes)
 // ──────────────────────────────────────────────
+app.use(trackRequest);
 app.use((req, res, next) => {
   const rid = generateRequestId();
   req.rid = rid;
@@ -207,21 +233,33 @@ app.use((err, req, res, _next) => {
 });
 
 // ──────────────────────────────────────────────
-//  Graceful shutdown
+//  Graceful shutdown (waits for active requests)
 // ──────────────────────────────────────────────
 let server;
 function shutdown(signal) {
-  log.info('shutdown signal received', { signal });
+  if (shuttingDown) return; // already shutting down
+  shuttingDown = true;
+  log.info('shutdown signal received', { signal, activeRequests });
+
+  const forceExit = setTimeout(() => {
+    log.error('forced shutdown after timeout', { remainingRequests: activeRequests });
+    process.exit(1);
+  }, 15000);
+
   if (server) {
     server.close(() => {
-      log.info('server closed');
-      process.exit(0);
+      const waitForRequests = setInterval(() => {
+        if (activeRequests === 0) {
+          clearInterval(waitForRequests);
+          clearTimeout(forceExit);
+          log.info('server closed gracefully');
+          process.exit(0);
+        }
+        log.info('waiting for active requests to complete', { activeRequests });
+      }, 500);
     });
-    setTimeout(() => {
-      log.error('forced shutdown after timeout');
-      process.exit(1);
-    }, 10000);
   } else {
+    clearTimeout(forceExit);
     process.exit(0);
   }
 }
@@ -232,3 +270,11 @@ server = app.listen(PORT, () => {
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
+
+// Prevent crash on unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  log.error('unhandled promise rejection', {
+    reason: reason?.message || reason,
+    stack: reason?.stack?.split('\n').slice(0, 3).join(' | '),
+  });
+});

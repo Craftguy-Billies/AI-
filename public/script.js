@@ -114,6 +114,18 @@ function hideLoading() {
 }
 
 // ──────────────────────────────────────────────
+//  Button state manager (prevents double-clicks)
+// ──────────────────────────────────────────────
+function setSubmitButtonsDisabled(disabled) {
+    var buttons = document.querySelectorAll('.btn-mystical');
+    for (var i = 0; i < buttons.length; i++) {
+        buttons[i].disabled = disabled;
+        buttons[i].style.opacity = disabled ? '0.6' : '1';
+        buttons[i].style.cursor = disabled ? 'not-allowed' : 'pointer';
+    }
+}
+
+// ──────────────────────────────────────────────
 //  Unified fetch wrapper with timeout & logging
 // ──────────────────────────────────────────────
 async function apiFetch(url, options, timeoutMs) {
@@ -132,8 +144,13 @@ async function apiFetch(url, options, timeoutMs) {
 
         if (!response.ok) {
             let errBody = '';
-            try { errBody = await response.text(); } catch (e) { /* ignore */ }
-            throw new Error('HTTP ' + response.status + ': ' + (errBody || response.statusText));
+            try {
+                var parsed = await response.json();
+                errBody = parsed.error || parsed.message || JSON.stringify(parsed);
+            } catch (e) {
+                try { errBody = await response.text(); } catch (e2) { errBody = response.statusText; }
+            }
+            throw new Error(errBody || ('伺服器錯誤 (' + response.status + ')'));
         }
 
         return await response.json();
@@ -164,6 +181,7 @@ async function handleAiTarotSubmit(event) {
     }
 
     frontendLog.info('aiTarot: submitting', { cardCount: cardCount, readingType: readingType, questionLen: question.length });
+    setSubmitButtonsDisabled(true);
     showLoading();
 
     try {
@@ -178,8 +196,9 @@ async function handleAiTarotSubmit(event) {
         saveReadingHistory({ type: 'ai-tarot', question: question, cardCount: cardCount, readingType: readingType });
     } catch (error) {
         frontendLog.error('aiTarot: fetch failed', { error: error.message });
-        handleError(error, 'AI塔羅占卜');
+        showToast(error.message || '在AI塔羅占卜過程中發生錯誤，請稍後再試', 'error');
     } finally {
+        setSubmitButtonsDisabled(false);
         hideLoading();
     }
 }
@@ -192,13 +211,14 @@ async function handleYesNoSubmit(event) {
 
     const question = document.getElementById('yesNoQuestion').value.trim();
 
-    if (!question) {
+    if (!question || question.length === 0) {
         showToast('請輸入您的問題', 'warning');
         frontendLog.warn('yesNo: empty question');
         return;
     }
 
     frontendLog.info('yesNo: submitting', { questionLen: question.length });
+    setSubmitButtonsDisabled(true);
     showLoading();
 
     try {
@@ -213,8 +233,9 @@ async function handleYesNoSubmit(event) {
         saveReadingHistory({ type: 'yes-no', question: question });
     } catch (error) {
         frontendLog.error('yesNo: fetch failed', { error: error.message });
-        handleError(error, '是否塔羅占卜');
+        showToast(error.message || '在是否塔羅占卜過程中發生錯誤，請稍後再試', 'error');
     } finally {
+        setSubmitButtonsDisabled(false);
         hideLoading();
     }
 }
@@ -224,6 +245,7 @@ async function handleYesNoSubmit(event) {
 // ──────────────────────────────────────────────
 async function getDailyReading() {
     frontendLog.info('dailyReading: fetching');
+    setSubmitButtonsDisabled(true);
     showLoading();
 
     try {
@@ -234,8 +256,9 @@ async function getDailyReading() {
         saveReadingHistory({ type: 'daily' });
     } catch (error) {
         frontendLog.error('dailyReading: fetch failed', { error: error.message });
-        handleError(error, '獲取每日運勢');
+        showToast(error.message || '在獲取每日運勢過程中發生錯誤，請稍後再試', 'error');
     } finally {
+        setSubmitButtonsDisabled(false);
         hideLoading();
     }
 }
@@ -307,12 +330,6 @@ function displayDailyResult(data) {
         + '</div>';
 
     resultDiv.scrollIntoView({ behavior: 'smooth' });
-}
-
-// 錯誤處理函數 (uses toast instead of alert)
-function handleError(error, context) {
-    frontendLog.error(context + '錯誤:', error);
-    showToast('在' + context + '過程中發生錯誤，請稍後再試', 'error');
 }
 
 // 成功提示函數
